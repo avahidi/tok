@@ -4,6 +4,13 @@ import (
 	"testing"
 )
 
+func add(db *Database, name, secret string) *Entry {
+	hash_, _ := hashFromName(DEFAULT_HASH)
+	e := NewEntry(name, secret, DEFAULT_PERIOD, DEFAULT_DIGITS, hash_)
+	db.Add(e)
+	return e
+}
+
 func TestDatabaseAdd(t *testing.T) {
 	db := &Database{}
 
@@ -11,8 +18,8 @@ func TestDatabaseAdd(t *testing.T) {
 		t.Fatalf("Empty database was not empty")
 	}
 
-	e1 := db.Add("entry 1", "secretone")
-	e2 := db.Add("entry 2", "secrettwo")
+	e1 := add(db, "entry 1", "secretone")
+	e2 := add(db, "entry 2", "secrettwo")
 
 	if len(db.Entries) != 2 {
 		t.Fatalf("Database should have 2 entries, not %d", len(db.Entries))
@@ -27,21 +34,21 @@ func TestDatabaseAdd(t *testing.T) {
 
 func TestDatabaseSearch(t *testing.T) {
 	db := &Database{}
-	e1 := db.Add("entry 1", "secretone")
-	e2 := db.Add("entry 2", "secrettwo")
+	e1 := add(db, "entry 1", "secretone")
+	e2 := add(db, "entry 2", "secrettwo")
 
-	if s1 := db.Find("entry 1"); s1 != e1 {
+	if s1 := db.FindExact("entry 1"); s1 != e1 {
 		t.Errorf("Find Failed: Wanted %v got %v", e1, s1)
 	}
-	if s2 := db.Find("entry 2"); s2 != e2 {
+	if s2 := db.FindExact("entry 2"); s2 != e2 {
 		t.Errorf("Find Failed: Wanted %v got %v", e2, s2)
 	}
 
-	if sx := db.Find("entry"); sx != e1 && sx != e2 {
+	if sx := db.FindFuzzy("entry"); len(sx) != 2 {
 		t.Errorf("Find Failed: Wanted %v or %v got %v", e1, e2, sx)
 	}
 
-	if s0 := db.Find("not here"); s0 != nil {
+	if s0 := db.FindFuzzy("not here"); len(s0) != 0 {
 		t.Errorf("Find returned non-existing entry")
 	}
 }

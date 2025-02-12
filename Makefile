@@ -1,12 +1,15 @@
 
 OUT=bin/tok
-SRC=main.go totp.go
+SRC=./...
 
 build:
 	go build -o $(OUT) ./...
 
 test:
-	go test ./...
+	go test -v ./...
+
+bench:
+	go test -v -bench=. -run=^Benchmark
 
 run: build
 	$(OUT) ls
@@ -22,7 +25,6 @@ dist:
 	GOOS=windows GOARCH=amd64 go build -o bin/tok-win-x64 $(SRC)
 	GOOS=freebsd GOARCH=386 go build -o bin/tok-bsd-x86 $(SRC)
 	GOOS=darwin GOARCH=arm64 go build -o bin/tok-osx-arm64 $(SRC)
-
 
 clean:
 	go clean

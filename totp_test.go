@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/sha1"
 	"testing"
 )
 
@@ -19,9 +21,9 @@ func TestHotp(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		totp := NewTotp([]byte(SECRET))
+		totp := NewTotp([]byte(SECRET), DEFAULT_PERIOD, 6, sha1.New)
 
-		got := totp.hotp(test.counter, 6)
+		got := totp.hotp(test.counter)
 		if got != test.output {
 			t.Errorf("HOTP(K, %d) expected %v got %v\n", test.counter, test.output, got)
 		}
@@ -37,26 +39,27 @@ func TestTotp(t *testing.T) {
 
 	tests := []struct {
 		secret string
+		hash_  crypto.Hash
 		time   int64
 		output uint32
 	}{
-		{SECRET1, 0x0000001, 94287082},
-		{SECRET1, 0x23523EC, 7081804},
-		{SECRET1, 0x23523ED, 14050471},
+		{SECRET1, crypto.SHA1, 0x0000001, 94287082},
+		{SECRET1, crypto.SHA1, 0x23523EC, 7081804},
+		{SECRET1, crypto.SHA1, 0x23523ED, 14050471},
 
-		{SECRET256, 0x0000001, 46119246},
-		{SECRET256, 0x23523EC, 68084774},
-		{SECRET256, 0x23523ED, 67062674},
+		{SECRET256, crypto.SHA256, 0x0000001, 46119246},
+		{SECRET256, crypto.SHA256, 0x23523EC, 68084774},
+		{SECRET256, crypto.SHA256, 0x23523ED, 67062674},
 
-		{SECRET512, 0x0000001, 90693936},
-		{SECRET512, 0x23523EC, 25091201},
-		{SECRET512, 0x23523ED, 99943326},
+		{SECRET512, crypto.SHA512, 0x0000001, 90693936},
+		{SECRET512, crypto.SHA512, 0x23523EC, 25091201},
+		{SECRET512, crypto.SHA512, 0x23523ED, 99943326},
 	}
 
 	for _, test := range tests {
-		totp := NewTotp([]byte(test.secret))
+		totp := NewTotp([]byte(test.secret), DEFAULT_PERIOD, 8, test.hash_.New)
 
-		got := totp.totp(test.time, 8)
+		got := totp.totp(test.time)
 		if got != test.output {
 			t.Errorf("TOTP(K, %d)expected %v got %v\n", test.time, test.output, got)
 		}
