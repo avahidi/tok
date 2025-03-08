@@ -18,6 +18,10 @@ import (
 	_ "crypto/sha512"
 )
 
+const (
+	PBKDF2_ITERATIONS = 45821
+)
+
 // secureRandom is a helper function for generating crypto-safe random
 func secureRandom(size int) []byte {
 	data := make([]byte, size)

@@ -25,7 +25,7 @@ dist:
 	GOOS=windows GOARCH=amd64 go build -o bin/tok-win-x64 $(SRC)
 	GOOS=freebsd GOARCH=386 go build -o bin/tok-bsd-x86 $(SRC)
 	GOOS=darwin GOARCH=arm64 go build -o bin/tok-osx-arm64 $(SRC)
-
+	cd bin && sha256sum tok-* > tok.hash
 clean:
 	go clean
 	rm -rf bin

@@ -1,14 +1,19 @@
 package main
 
 import (
-	"crypto"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"path"
-	"strings"
-	"time"
+)
+
+const (
+	DATABASE_FILENAME = ".tokdb"
+	DEFAULT_HASH      = "sha1"
+	DEFAULT_DIGITS    = 6
+	DEFAULT_PERIOD    = 30
+	DEFAULT_TIME      = 30
 )
 
 // Config is the current application configuration
@@ -17,8 +22,10 @@ type Config struct {
 	DatabaseFilename string
 	Period           int
 	Digits           int
-	HashAlgorithm    crypto.Hash
+	HashAlgorithm    string
 	password         string
+	Verbose          bool
+	Time             int
 }
 
 // Password returns the database password.
@@ -45,12 +52,14 @@ func usage() {
 
 	fmt.Fprintf(out, "OPTIONS:\n")
 	flag.PrintDefaults()
-	fmt.Fprintf(out, "COMMANDS::\n"+
+	fmt.Fprintf(out, "COMMANDS:\n"+
 		"    add <NAME> <KEY>\n"+
+		"    add otpauth://totp/...\n"+
 		"    rm <name>\n"+
 		"    ls\n"+
 		"    show <NAME>\n"+
-		"    <name> (same as show <NAME>)\n",
+		"    show \\#<NUMBER>\n"+
+		"    <NAME> (same as show <NAME>)\n",
 	)
 	fmt.Fprintf(out, "ENVIRONMENT:\n"+
 		"    TOK_PASSWORD: database password, if you don't want to read it from command line\n",
@@ -66,9 +75,12 @@ func parseParams() (*Config, []string) {
 	defaultDbFile := path.Join(home, DATABASE_FILENAME)
 
 	filename := flag.String("db", defaultDbFile, "the database")
+	time := flag.Int("time", DEFAULT_TIME, "display time")
 	period := flag.Int("period", DEFAULT_PERIOD, "token period")
 	digits := flag.Int("digits", DEFAULT_DIGITS, "token digits")
-	hashName := flag.String("hash", DEFAULT_HASH, "totp hash algorithm")
+	hashname := flag.String("hash", DEFAULT_HASH, "totp hash algorithm")
+	verbose := flag.Bool("verbose", false, "verbose output")
+
 	flag.Usage = usage
 	flag.Parse()
 
@@ -78,18 +90,13 @@ func parseParams() (*Config, []string) {
 		os.Exit(20)
 	}
 
-	hash_, err := hashFromName(*hashName)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to parse hash: %s\n", err)
-		flag.Usage()
-		os.Exit(20)
-	}
-
 	cfg := &Config{
 		DatabaseFilename: *filename,
 		Period:           *period,
 		Digits:           *digits,
-		HashAlgorithm:    hash_,
+		HashAlgorithm:    *hashname,
+		Verbose:          *verbose,
+		Time:             *time,
 	}
 
 	return cfg, args
@@ -112,77 +119,37 @@ func getDatabase(cfg *Config, allowCreate bool) (*Database, error) {
 	return db, err
 }
 
-// messageWithProgress creates a colored progress bar with the message in the middle,
-// color changes to red when we are past 75% progress
-func messageWithProgress(msg string, curr, max int) (string, int) {
-	const WIDTH = 60
-	colorFG, colorBG := TERM_FG+TERM_BLACK, TERM_BG+TERM_YELLOW
-	s1 := (WIDTH - len(msg)) / 2
-	s2 := WIDTH - s1 - len(msg)
-	str := fmt.Sprintf("%s%s%s", strings.Repeat(" ", s1), msg, strings.Repeat(" ", s2))
-	pos := curr * WIDTH / max
-
-	if curr*4 > max*3 {
-		colorFG = TERM_FG + TERM_WHITE
-		colorBG = TERM_BG + TERM_RED
-	}
-	return fmt.Sprintf("%s%s%s%s%s%s",
-		TextControl(colorFG), TextControl(colorBG),
-		str[:pos],
-		TextControl(TERM_BG+TERM_DEFAULT),
-		str[pos:],
-		TextControl(TERM_RESET),
-	), WIDTH
-}
-
-// showEntry will try to show the token in a somewhat readable way
-func showEntry(entry *Entry) error {
-	totp, err := entry.Totp()
-	if err != nil {
-		return err
-	}
-
-	fmt.Printf("\nToken '%s', added %s:\n\n",
-		TextWrap(TERM_BOLD, TERM_NORMAL, entry.Name),
-		entry.Date())
-
-	// TODO: change this to continue until Ctrl-C
-	written := 0
-	for i := 0; i < SHOWN_TIME; i++ {
-		timeleft, kod := totp.Generate()
-		line, size := messageWithProgress(kod, int(totp.Period)-timeleft, int(totp.Period))
-		written = size
-		fmt.Printf("  [%s] \r", line)
-		time.Sleep(time.Second)
-	}
-
-	// at exit write over visible text.
-	// XXX: this will not run if user presses Ctrl-C
-	fmt.Printf("\r  [%s]  \n", strings.Repeat("*", written))
-	return nil
-}
-
-func cmdAdd(cfg *Config, name, secret string) error {
-	// first check if the secret is reasonable
-	if _, err := secretFromBase64(secret); err != nil {
-		return err
-	}
-	entry := NewEntry(name, secret, uint16(cfg.Period), uint8(cfg.Digits), cfg.HashAlgorithm)
+func addEntry(cfg *Config, entry *Entry) error {
 	db, err := getDatabase(cfg, true)
 	if err != nil {
 		return err
 	}
 
-	if entry := db.FindExact(name); entry != nil {
-		return fmt.Errorf("Item '%s' already exists, remove it first", name)
+	if err := db.Add(entry); err != nil {
+		return err
 	}
 
 	db.Add(entry)
 	if err := db.Save(); err != nil {
 		return err
 	}
+	return showEntry(cfg.Time, entry)
+}
 
-	return showEntry(entry)
+func cmdAdd(cfg *Config, name, secret string) error {
+	entry, err := NewEntry(name, secret, cfg.HashAlgorithm, "", cfg.Period, cfg.Digits)
+	if err != nil {
+		return err
+	}
+	return addEntry(cfg, entry)
+}
+
+func cmdAddUri(cfg *Config, uristr string) error {
+	entry, err := EntryFromUri(uristr)
+	if err != nil {
+		return err
+	}
+	return addEntry(cfg, entry)
 }
 
 func cmdRemove(cfg *Config, name string) error {
@@ -196,7 +163,7 @@ func cmdRemove(cfg *Config, name string) error {
 		return fmt.Errorf("entry '%s' does not exist", name)
 	}
 
-	fmt.Printf("Removed %s\n", e)
+	fmt.Printf("Removed %s\n", e.Name)
 	return db.Save()
 }
 
@@ -206,21 +173,18 @@ func cmdSearch(cfg *Config, name string) error {
 		log.Fatalf("Internal error: %v\n", err)
 	}
 
-	entry := db.FindExact(name)
-	if entry != nil {
-		return showEntry(entry)
+	entries, err := db.Find(name)
+	if err != nil {
+		return err
 	}
 
-	entries := db.FindFuzzy(name)
 	switch len(entries) {
 	case 0:
 		return fmt.Errorf("unable to find '%s'", name)
 	case 1:
-		return showEntry(entries[0])
+		return showEntry(cfg.Time, entries[0])
 	default:
-		for i, e := range entries {
-			fmt.Printf("\t%d\t%v\n", i+1, e)
-		}
+		showEntries(false, entries)
 		return fmt.Errorf("multiple items matching '%s'", name)
 	}
 }
@@ -231,9 +195,7 @@ func cmdList(cfg *Config) error {
 		log.Fatalf("Internal error: %v\n", err)
 	}
 
-	for i, entry := range db.Entries {
-		fmt.Printf("%03d %v\n", i+1, entry)
-	}
+	showEntries(cfg.Verbose, db.Entries)
 	return nil
 }
 
@@ -242,8 +204,11 @@ func main() {
 	cmd, params := args[0], args[1:]
 
 	// check if we received the correct number of parameters
-	cmdParams := map[string]int{"add": 2, "rm": 1, "ls": 0, "show": 1}
-	if count, ok := cmdParams[cmd]; (ok && count != len(params)) || (!ok && len(params) != 1) {
+	n := len(params)
+	if (cmd == "add" && (n < 1 || n > 2)) ||
+		(cmd == "rm" && n != 1) ||
+		(cmd == "ls" && n != 0) ||
+		(cmd == "show" && n != 1) {
 		usage()
 		os.Exit(20)
 	}
@@ -251,7 +216,11 @@ func main() {
 	var err error
 	switch cmd {
 	case "add":
-		err = cmdAdd(cfg, params[0], params[1])
+		if len(params) == 1 {
+			err = cmdAddUri(cfg, params[0])
+		} else {
+			err = cmdAdd(cfg, params[0], params[1])
+		}
 	case "rm":
 		err = cmdRemove(cfg, params[0])
 	case "ls":

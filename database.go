@@ -5,7 +5,17 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
+)
+
+const (
+	DATABASE_VERSION   uint32 = 1
+	PASSWORD_SALT_SIZE        = 32
+)
+
+var (
+	DATABASE_MAGIC [4]byte = [4]byte{'t', 'o', 'k', 'B'}
 )
 
 // databaseHeader represents the file format database header
@@ -48,25 +58,64 @@ func LoadDatabase(filename, password string) (*Database, error) {
 }
 
 // Add adds an entry to the database (but doesn't save it)
-func (db *Database) Add(entry *Entry) {
+func (db *Database) Add(entry *Entry) error {
+	if db.findExact(entry.Name) != nil {
+		return fmt.Errorf("Item '%s' already exists, remove it first", entry.Name)
+	}
+
 	db.Entries = append(db.Entries, entry)
+	return nil
 }
 
 // Delete removes an entry from the database (but doesn't save it)
 func (db *Database) Delete(name string) *Entry {
-	name = strings.ToLower(name)
-
-	for i, e := range db.Entries {
-		if strings.ToLower(e.Name) == name {
-			db.Entries = append(db.Entries[:i], db.Entries[i+1:]...)
-			return e
+	entries, err := db.Find(name)
+	if err != nil || len(entries) != 1 {
+		fmt.Printf("Could not select unique item '%s'\n", name)
+	} else if len(entries) == 1 {
+		e1 := entries[0]
+		for i, e := range db.Entries {
+			if e == e1 {
+				db.Entries = append(db.Entries[:i], db.Entries[i+1:]...)
+				return e
+			}
 		}
 	}
 	return nil
 }
 
-// FindExact will search for a token with this exact name
-func (db Database) FindExact(name string) *Entry {
+// Find will try to find an entry, either by index, exact name or fuzzy search
+func (db Database) Find(name string) ([]*Entry, error) {
+	if entry, err := db.findIndex(name); err != nil {
+		return nil, err
+	} else if entry != nil {
+		return []*Entry{entry}, nil
+	}
+	if entry := db.findExact(name); entry != nil {
+		return []*Entry{entry}, nil
+	}
+
+	return db.findFuzzy(name), nil
+}
+
+// findIndex will find entry from index in format "#<number"
+func (db Database) findIndex(name string) (*Entry, error) {
+	if name[0] != '#' {
+		return nil, nil
+	}
+	idx, err := strconv.ParseInt(name[1:], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid number %s: %v", name, err)
+	}
+	n := int(idx - 1)
+	if n < 0 || n >= len(db.Entries) {
+		return nil, fmt.Errorf("Entry %s does not exist", name)
+	}
+	return db.Entries[n], nil
+}
+
+// findExact will search for a token with this exact name
+func (db Database) findExact(name string) *Entry {
 	name = strings.ToLower(name)
 	// check for exact match first
 	for _, e := range db.Entries {
@@ -77,9 +126,9 @@ func (db Database) FindExact(name string) *Entry {
 	return nil
 }
 
-// FindFuzzy will find a token with similar name.
+// findFuzzy will find a token with similar name.
 // Currently this is done by a simple substring search
-func (db Database) FindFuzzy(name string) []*Entry {
+func (db Database) findFuzzy(name string) []*Entry {
 	name = strings.ToLower(name)
 
 	var ret []*Entry

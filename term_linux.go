@@ -1,3 +1,5 @@
+//go:build linux
+
 /*
  * Minimal terminal support code, so we don't have to bring in an external package
  */
@@ -8,24 +10,6 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
-)
-
-// see https://en.wikipedia.org/wiki/ANSI_escape_code
-const (
-	TERM_RESET  = 0
-	TERM_NORMAL = 0
-	TERM_BOLD   = 1
-	TERM_FAINT  = 2
-	TERM_FG     = 30
-	TERM_BG     = 40
-
-	TERM_BLACK   = 0
-	TERM_RED     = 1
-	TERM_GREEN   = 2
-	TERM_YELLOW  = 3
-	TERM_BLUE    = 4
-	TERM_WHITE   = 7
-	TERM_DEFAULT = 9
 )
 
 func getTermState() (syscall.Termios, error) {
@@ -77,12 +61,4 @@ func ReadPassword(prompt string) (string, error) {
 	}
 
 	return ret, nil
-}
-
-func TextControl(code int) string {
-	return fmt.Sprintf("\033[%dm", code)
-}
-
-func TextWrap(start, end int, text string) string {
-	return fmt.Sprintf("%s%s%s", TextControl(start), text, TextControl(end))
 }

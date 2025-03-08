@@ -6,6 +6,10 @@ import (
 	"io"
 )
 
+var (
+	BYTE_ORDER = binary.BigEndian
+)
+
 // ReadExact is a helper function for reading an exact amount of bytes
 func ReadExact(r io.Reader, size int) ([]byte, error) {
 	buffer := make([]byte, size)
@@ -82,14 +86,12 @@ func WriteOne(w io.Writer, order binary.ByteOrder, obj any) error {
 	case string:
 		asBytes := []byte(x)
 		return WriteSized(w, order, asBytes)
-		/*
-			case []byte:
-				if err := binary.Write(w, order, uint32( len(x))); err != nil {
-					return err
-				}
-				_, err := w.Write(x)
-				return err
-		*/
+	case []byte:
+		if err := binary.Write(w, order, uint32(len(x))); err != nil {
+			return err
+		}
+		_, err := w.Write(x)
+		return err
 	default:
 		return binary.Write(w, order, obj)
 	}

@@ -50,17 +50,13 @@ func (t Totp) Generate() (int, string) {
 	now := tx()
 	counter := now / t.Period
 	timeleft := int(t.Period - now%t.Period)
-
 	kod := fmt.Sprintf("%d", t.totp(counter))
 
 	// There is probably a better printf formatter for this...
 	for len(kod) < t.Digits {
 		kod = "0" + kod
 	}
-
-	// add some space in the middle and make it a bit prettier...
-	mid := len(kod) / 2
-	return timeleft, fmt.Sprintf("%s  %s", kod[:mid], kod[mid:])
+	return timeleft, kod
 }
 
 // helper to return the mod value for a number of digits
