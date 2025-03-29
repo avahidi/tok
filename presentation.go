@@ -28,12 +28,6 @@ func TextControl(code int) string {
 	return fmt.Sprintf("\033[%dm", code)
 }
 
-/*
-func TextWrap(start, end int, text string) string {
-	return fmt.Sprintf("%s%s%s", TextControl(start), text, TextControl(end))
-}
-*/
-
 // codeWithProgress creates a progress bar with the kod
 func codeWithProgress(kod string, curr, max int) string {
 	// add some space in the middle and make it a bit prettier...
@@ -67,8 +61,12 @@ func showEntry(tim int, entry *Entry) error {
 		return err
 	}
 
-	fmt.Printf("\nToken %s'%s'%s, added %s:\n\n",
+	fmt.Printf("\nToken %s'%s'%s, added %s:\n",
 		TextControl(TERM_BOLD), entry.Name, TextControl(TERM_NORMAL), entry.Date())
+	if entry.Note != "" {
+		fmt.Printf("%s\n", entry.Note)
+	}
+	fmt.Println()
 
 	var line string
 	for i := 0; i < tim; i++ {

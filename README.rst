@@ -23,6 +23,14 @@ Use a token::
     282  573
 
 
+How to install
+--------------
+
+Build from source code::
+
+    sudo apt install golang
+    go install github.com/avahidi/tok@latest
+
 
 Security note
 ~~~~~~~~~~~~~

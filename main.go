@@ -53,7 +53,7 @@ func usage() {
 	fmt.Fprintf(out, "OPTIONS:\n")
 	flag.PrintDefaults()
 	fmt.Fprintf(out, "COMMANDS:\n"+
-		"    add <NAME> <KEY>\n"+
+		"    add <NAME> <KEY> [NOTE]\n"+
 		"    add otpauth://totp/...\n"+
 		"    rm <name>\n"+
 		"    ls\n"+
@@ -78,8 +78,8 @@ func parseParams() (*Config, []string) {
 	time := flag.Int("time", DEFAULT_TIME, "display time")
 	period := flag.Int("period", DEFAULT_PERIOD, "token period")
 	digits := flag.Int("digits", DEFAULT_DIGITS, "token digits")
-	hashname := flag.String("hash", DEFAULT_HASH, "totp hash algorithm")
-	verbose := flag.Bool("verbose", false, "verbose output")
+	hashname := flag.String("hash", DEFAULT_HASH, "TOTP hash algorithm")
+	verbose := flag.Bool("v", false, "verbose output")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -136,8 +136,8 @@ func addEntry(cfg *Config, entry *Entry) error {
 	return showEntry(cfg.Time, entry)
 }
 
-func cmdAdd(cfg *Config, name, secret string) error {
-	entry, err := NewEntry(name, secret, cfg.HashAlgorithm, "", cfg.Period, cfg.Digits)
+func cmdAdd(cfg *Config, name, secret, note string) error {
+	entry, err := NewEntry(name, secret, cfg.HashAlgorithm, note, cfg.Period, cfg.Digits)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func main() {
 
 	// check if we received the correct number of parameters
 	n := len(params)
-	if (cmd == "add" && (n < 1 || n > 2)) ||
+	if (cmd == "add" && (n < 1 || n > 3)) ||
 		(cmd == "rm" && n != 1) ||
 		(cmd == "ls" && n != 0) ||
 		(cmd == "show" && n != 1) {
@@ -219,7 +219,8 @@ func main() {
 		if len(params) == 1 {
 			err = cmdAddUri(cfg, params[0])
 		} else {
-			err = cmdAdd(cfg, params[0], params[1])
+			params = append(params, "") // add empty note if it was not provided
+			err = cmdAdd(cfg, params[0], params[1], params[2])
 		}
 	case "rm":
 		err = cmdRemove(cfg, params[0])

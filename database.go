@@ -190,7 +190,7 @@ func (db *Database) load() error {
 	var entries []*Entry
 	for i := 0; i < int(count); i++ {
 		entry := &Entry{}
-		if err := entry.ReadFrom(r2); err != nil {
+		if err := entry.Deserial(r2); err != nil {
 			return err
 		}
 		entries = append(entries, entry)
@@ -214,7 +214,7 @@ func (db Database) Save() error {
 	}
 
 	for _, entry := range db.Entries {
-		if err := entry.WriteTo(plain); err != nil {
+		if err := entry.Serial(plain); err != nil {
 			return err
 		}
 	}

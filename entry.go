@@ -78,11 +78,11 @@ func EntryFromUri(uristr string) (*Entry, error) {
 	return NewEntry(uri.Path[1:], query.Get("secret"), query.Get("algorithm"), "", int(period), int(digits))
 }
 
-func (e Entry) WriteTo(w io.Writer) error {
+func (e Entry) Serial(w io.Writer) error {
 	return WriteMultiple(w, BYTE_ORDER, e.Added, e.Period, e.Digits, uint64(e.Hash), e.Name, e.Secret, e.Note)
 }
 
-func (e *Entry) ReadFrom(r io.Reader) error {
+func (e *Entry) Deserial(r io.Reader) error {
 	var tmp uint64
 	err := ReadMultiple(r, BYTE_ORDER, &e.Added, &e.Period, &e.Digits, &tmp, &e.Name, &e.Secret, &e.Note)
 	e.Hash = crypto.Hash(tmp) // Read cant handle crypto.Hash=uint, but uint64 works fine

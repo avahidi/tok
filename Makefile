@@ -17,6 +17,9 @@ run: build
 fmt:
 	go fmt ./...
 
+vet:
+	go vet ./...
+
 dist:
 	GOOS=linux GOARCH=386 go build -o bin/tok-linux-x86 $(SRC)
 	GOOS=linux GOARCH=amd64 go build -o bin/tok-linux-x64 $(SRC)
