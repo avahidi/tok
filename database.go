@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -171,7 +172,10 @@ func (db *Database) load() error {
 
 	dec, err := decryptBytes(key, enc)
 	if err != nil {
-		return err
+		// the reason we don't return and error and instead terminate is that if password
+		// was incorrect, we may end up creating a new one (with the bad password) and
+		// overwrite the existing database
+		log.Fatalf("Unable to decrypt database. Check your password!\n")
 	}
 
 	// 4. read the items from the decrypted buffer, start with number of enteries
