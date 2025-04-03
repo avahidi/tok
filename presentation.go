@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -83,17 +84,24 @@ func showEntry(tim int, entry *Entry) error {
 }
 
 // showEntries lists a set of entries but does not show the token
-func showEntries(verbose bool, entries []*Entry) {
+func showEntries(asuri, verbose bool, entries []*Entry) {
 	for i, entry := range entries {
-		if verbose {
+		if asuri {
+			str, err := EntryToUri(entry)
+			if err != nil {
+				log.Fatalf("Unable to convert entry to uri: '%v'", err)
+			}
+			fmt.Printf("%3d - %s\n", i+1, str)
+
+		} else if verbose {
 			fmt.Printf("%3d - %s\n", i+1, entry.Name)
 			if entry.Note != "" {
 				fmt.Printf("\tNote: %s\n", entry.Note)
 			}
 			fmt.Printf("\tDate added: %s\n", entry.Date())
-			fmt.Printf("\tToken period: %d\n", entry.Period)
+			fmt.Printf("\tPeriod: %d\n", entry.Period)
 			fmt.Printf("\tDigits: %d\n", entry.Digits)
-			fmt.Printf("\tHash: %d\n", entry.Hash)
+			fmt.Printf("\tHash: %s\n", hashToName(entry.Hash))
 			fmt.Printf("\n")
 		} else {
 			fmt.Printf("%3d - %s\n", i+1, entry.Name)

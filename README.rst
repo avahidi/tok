@@ -8,10 +8,14 @@ Usage
 
 Add a token::
 
-    $ tok add "my test token" VBWAFMHKU522CBPO
+    $ tok add
+    Enter name: my test token
+    Enter secret:
+    Enter note: VBWAFMHKU522CBPO
     Please enter database password: *****
-    ...
 
+    Token 'my test token', added 2025-01-01 00:00:00
+    123 456
 
 
 Use a token::
@@ -19,8 +23,16 @@ Use a token::
     tok test
     Please enter database password: *****
 
-    Token 'my test token', added 2025-02-01 22:00:00:
-    282  573
+    Token 'my test token', added 2025-01-01 00:00:00:
+    123 456
+
+
+Adding and exporting tokens using the key-uri format::
+
+    $ tok import "otpauth://totp/my%20test%20token?secret=VBWAFMHKU522CBPO&issuer=issuer&algorithm=SHA1&digits=6&period=30"
+    ...
+    $ tok export test
+      1 - otpauth://totp/...
 
 
 How to install

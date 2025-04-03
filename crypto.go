@@ -133,8 +133,8 @@ func decryptBytes(key, data []byte) ([]byte, error) {
 // hashFromName converts hash name to crypto.Hash
 func hashFromName(name string) (crypto.Hash, error) {
 	name = strings.ToLower(name)
-	name = strings.Replace(name, "-", "", -1)
-	name = strings.Replace(name, "_", "", -1)
+	name = strings.ReplaceAll(name, "_", "")
+	name = strings.ReplaceAll(name, "-", "")
 
 	switch name {
 	case "sha1":
@@ -146,4 +146,8 @@ func hashFromName(name string) (crypto.Hash, error) {
 	default:
 		return 0, fmt.Errorf("unknown hash format: '%s'", name)
 	}
+}
+
+func hashToName(h crypto.Hash) string {
+	return strings.ReplaceAll(h.String(), "-", "") // SHA-1 -> SHA1 and so on
 }

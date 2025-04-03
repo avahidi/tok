@@ -35,7 +35,7 @@ func (c *Config) Password() (string, error) {
 		c.password = os.Getenv("TOK_PASSWORD")
 	}
 	if c.password == "" {
-		password, err := ReadPassword("Please enter database password: ")
+		password, err := ReadInput("Please enter database password: ", true)
 		if err != nil {
 			return "", err
 		}
@@ -53,15 +53,16 @@ func usage() {
 	fmt.Fprintf(out, "OPTIONS:\n")
 	flag.PrintDefaults()
 	fmt.Fprintf(out, "COMMANDS:\n"+
+		"    add <NAME>\n"+
 		"    add <NAME> <KEY> [NOTE]\n"+
-		"    add otpauth://totp/...\n"+
+		"    import otpauth://totp/...\n"+
+		"    export <NAME>\n"+
 		"    rm <name>\n"+
 		"    ls\n"+
 		"    show <NAME>\n"+
-		"    show \\#<NUMBER>\n"+
 		"    <NAME> (same as show <NAME>)\n",
 	)
-	fmt.Fprintf(out, "ENVIRONMENT:\n"+
+	fmt.Fprintf(out, "Environment:\n"+
 		"    TOK_PASSWORD: database password, if you don't want to read it from command line\n",
 	)
 }
@@ -144,12 +145,30 @@ func cmdAdd(cfg *Config, name, secret, note string) error {
 	return addEntry(cfg, entry)
 }
 
-func cmdAddUri(cfg *Config, uristr string) error {
+func cmdImport(cfg *Config, uristr string) error {
 	entry, err := EntryFromUri(uristr)
 	if err != nil {
 		return err
 	}
 	return addEntry(cfg, entry)
+}
+
+func cmdExport(cfg *Config, name string) error {
+	db, err := getDatabase(cfg, false)
+	if err != nil {
+		log.Fatalf("Internal error: %v\n", err)
+	}
+
+	entries, err := db.Find(name)
+	if err != nil {
+		return err
+	}
+
+	if len(entries) == 0 {
+		return fmt.Errorf("unable to find '%s'", name)
+	}
+	showEntries(true, false, entries)
+	return nil
 }
 
 func cmdRemove(cfg *Config, name string) error {
@@ -184,7 +203,7 @@ func cmdSearch(cfg *Config, name string) error {
 	case 1:
 		return showEntry(cfg.Time, entries[0])
 	default:
-		showEntries(false, entries)
+		showEntries(false, false, entries)
 		return fmt.Errorf("multiple items matching '%s'", name)
 	}
 }
@@ -195,7 +214,7 @@ func cmdList(cfg *Config) error {
 		log.Fatalf("Internal error: %v\n", err)
 	}
 
-	showEntries(cfg.Verbose, db.Entries)
+	showEntries(false, cfg.Verbose, db.Entries)
 	return nil
 }
 
@@ -205,7 +224,9 @@ func main() {
 
 	// check if we received the correct number of parameters
 	n := len(params)
-	if (cmd == "add" && (n < 1 || n > 3)) ||
+	if (cmd == "add" && n > 3) ||
+		(cmd == "import" && n != 1) ||
+		(cmd == "export" && n != 1) ||
 		(cmd == "rm" && n != 1) ||
 		(cmd == "ls" && n != 0) ||
 		(cmd == "show" && n != 1) {
@@ -216,12 +237,25 @@ func main() {
 	var err error
 	switch cmd {
 	case "add":
-		if len(params) == 1 {
-			err = cmdAddUri(cfg, params[0])
-		} else {
-			params = append(params, "") // add empty note if it was not provided
-			err = cmdAdd(cfg, params[0], params[1], params[2])
+		params = append(params, "", "", "") // make room for missing or optional parameters
+		name, secret, notes := params[0], params[1], params[2]
+		if n == 0 {
+			name, err = ReadInput("Enter name: ", false)
 		}
+		if err == nil && n < 2 {
+			secret, err = ReadInput("Enter secret: ", false)
+		}
+
+		if err == nil && n < 2 { // not 3, user name choose to not add a note
+			notes, err = ReadInput("Enter note: ", false)
+		}
+		if err == nil {
+			err = cmdAdd(cfg, name, secret, notes)
+		}
+	case "import":
+		err = cmdImport(cfg, params[0])
+	case "export":
+		err = cmdExport(cfg, params[0])
 	case "rm":
 		err = cmdRemove(cfg, params[0])
 	case "ls":

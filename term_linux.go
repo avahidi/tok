@@ -6,8 +6,10 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
+	"strings"
 	"syscall"
 	"unsafe"
 )
@@ -38,27 +40,29 @@ func setTermState(s syscall.Termios) error {
 	return nil
 }
 
-func ReadPassword(prompt string) (string, error) {
-	old, err := getTermState()
-	if err != nil {
-		return "", nil
-	}
+func ReadInput(prompt string, noecho bool) (string, error) {
 
-	new_ := old
-	new_.Lflag &^= syscall.ECHO
-	if err := setTermState(new_); err != nil {
-		return "", nil
+	if noecho {
+		old, err := getTermState()
+		if err != nil {
+			return "", nil
+		}
+
+		new_ := old
+		new_.Lflag &^= syscall.ECHO
+		if err := setTermState(new_); err != nil {
+			return "", nil
+		}
+
+		defer setTermState(old)
 	}
 
 	fmt.Printf("%s", prompt)
-
-	var ret string
-	fmt.Scanln(&ret)
-	fmt.Println()
-
-	if err := setTermState(old); err != nil {
-		return "", nil
+	reader := bufio.NewReader(os.Stdin)
+	ret, err := reader.ReadString('\n')
+	ret = strings.Trim(ret, "\n\r")
+	if noecho {
+		fmt.Println()
 	}
-
-	return ret, nil
+	return ret, err
 }
